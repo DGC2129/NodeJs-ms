@@ -47,9 +47,3 @@ jobs:
         run: |
           cd terraform
           terraform Plan         
-          
-      - name: Apply Terraform Configuration
-        run: |
-          if: github.ref == 'refs/heads/main'
-          cd terraform
-          terraform apply -auto-approve
