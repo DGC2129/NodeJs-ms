@@ -89,9 +89,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.TMP_PAT_TOKEN }}    
-          
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin 
 
       - name: Log in to Amazon ECR
         run: |
@@ -99,12 +96,11 @@ jobs:
 
       - name: docker build
         run: |         
-          docker build -t gopidevopskanna/github_action_pateient_service:latest .
-          docker tag gopidevopskanna/github_action_pateient_service:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}
-
+          docker build -t my-ecr .
+          docker tag my-ecr:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}
+          
       - name: docker Push
         run: |
-          docker push gopidevopskanna/github_action_docker:latest
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}   
 
   Deploy-To-EKS:
