@@ -13,6 +13,7 @@ env:
   IMAGE_TAG: latest
   K8S_DEPLOYMENT: patient-service
   K8S_NAMESPACE: default
+  AWS_REGION: us-east-1
 
 jobs:
   build-and-test:
