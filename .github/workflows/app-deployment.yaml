@@ -31,45 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm install       
 
-  # Deploy-Infra:
-  #   name: "Terraform Deployment"
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       shell: bash
-  #       working-directory: envs/dev  # Change to "envs/staging" or "envs/prod" as needed
-
-  #   steps:
-  #     - name: "Checkout Repository"
-  #       uses: actions/checkout@v3
-
-  #     - name: "Setup Terraform"
-  #       uses: hashicorp/setup-terraform@v2
-  #       with:
-  #         terraform_version: 1.10.0
-
-  #     - name: "Terraform Init"
-  #       run: terraform init
-
-  #     - name: "Terraform Format Check"
-  #       run: terraform fmt -check
-
-  #     - name: "Terraform Validate"
-  #       run: terraform validate
-
-  #     - name: "Terraform Plan"
-  #       run: terraform plan
-  #       env:
-  #         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-  #     - name: "Terraform Apply"
-  #       if: github.ref == 'refs/heads/main'
-  #       run: terraform apply -auto-approve tfplan
-  #       env:
-  #         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
   docker-build-push:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -82,27 +43,21 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Log into GH registry
-        uses: actions/checkout@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.TMP_PAT_TOKEN }}            
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: docker build
-        run: |         
-          docker build -t my-ecr .
-          docker tag my-ecr:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}
-
-      - name: docker Push
+      - name: Build and tag Docker image
         run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}   
+          docker build -t my-ecr .
+          docker tag my-ecr:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}
 
   Deploy-to-EKS:
     needs: docker-build-push
@@ -111,28 +66,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-          
-         # role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsEKS
-         # aws-region: us-east-1 
-        
-      - name: Set up kubectl
+
+      - name: Configure kubectl
         run: |
           aws eks update-kubeconfig --name hcl-eks-bs5zYHqX --region $AWS_REGION
           kubectl get nodes  # Verify authentication
 
+      - name: Verify Kubernetes manifests exist
+        run: |
+          if [ ! -f deployment.yaml ] || [ ! -f patient-lb.yaml ]; then
+            echo "Missing deployment.yaml or patient-lb.yaml"
+            exit 1
+          fi
+
       - name: Deploy Application to EKS
         run: |
           kubectl apply -f deployment.yaml
-          kubectl apply -f patient-lb.yaml               
-
-
-       
+          kubectl apply -f patient-lb.yaml  
