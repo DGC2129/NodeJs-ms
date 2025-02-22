@@ -29,28 +29,28 @@ jobs:
       - name: Install dependencies
         run: npm install   
 
-  deploy-infra:
-    name: Deploy Infrastructure with Terraform
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+  # deploy-infra:
+   # name: Deploy Infrastructure with Terraform
+    #runs-on: ubuntu-latest
+    #steps:
+     # - name: Checkout Code
+      #  uses: actions/checkout@v3
 
-      - name: Set Up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.3.0
+      #- name: Set Up Terraform
+       # uses: hashicorp/setup-terraform@v2
+        #with:
+         # terraform_version: 1.3.0
 
-      - name: Initialize Terraform
-        run: |
-          cd terraform
-          terraform version
-          terraform init
+      #- name: Initialize Terraform
+       # run: |
+        #  cd terraform
+         # terraform version
+          #terraform init
           
       - name: Validate Terraform    
         run: |
           terraform fmt
-          terraform validate
+          terraform validate /*
 
       #- name: "Terraform Plan"
        # run: terraform plan
