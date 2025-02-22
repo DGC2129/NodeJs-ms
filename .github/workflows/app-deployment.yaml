@@ -1,20 +1,18 @@
-name: "Deployment services to EKS Cluster"
+name: CI/CD for Patient Service
 
 on:
   push:
     branches:
       - main
-      - dev
+      - DGC2129-patch-1 
   pull_request:
     branches:
       - main
-
 env:
-  ECR_REPOSITORY: my-ecr
+  ECR_REPOSITORY: myrepo
   IMAGE_TAG: latest
   K8S_DEPLOYMENT: patient-service
-  K8S_NAMESPACE: default 
-  AWS_REGION: us-east-1
+  K8S_NAMESPACE: default
 
 jobs:
   build-and-test:
@@ -29,12 +27,11 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: npm install       
-        
-deploy-infra:
+        run: npm install   
+
+  deploy-infra:
     name: Deploy Infrastructure with Terraform
     runs-on: ubuntu-latest
-    needs: docker-build-test
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -61,9 +58,9 @@ deploy-infra:
       #- name: "Terraform Apply"
        # run: |
         # if: github.ref == 'refs/heads/main'
-        # terraform apply -auto-approve 
+        # terraform apply -auto-approve           
 
-docker-build-push:
+  docker-build-push:
     needs: deploy-infra
     runs-on: ubuntu-latest
     steps:
@@ -96,7 +93,7 @@ docker-build-push:
       - name: docker Push
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}   
-
+          
   deploy:
     needs: docker-build-push
     runs-on: ubuntu-latest
@@ -107,22 +104,16 @@ docker-build-push:
       - name: Configure kubectl
         uses: azure/setup-kubectl@v3
 
-      - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-          
-         # role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsEKS
-         # aws-region: us-east-1 
-        
-      - name: Set up kubectl
+      - name: Set up Kubeconfig
         run: |
-          aws eks update-kubeconfig --name hcl-eks-bs5zYHqX --region $AWS_REGION
-          kubectl get nodes  # Verify authentication
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 --decode >> $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
-      - name: Deploy Application to EKS
+      - name: Deploy to Kubernetes
+        env:
+          REPO_URL: https://github.com/Patient-Service
         run: |
           kubectl apply -f deployment.yaml
-          kubectl apply -f patient-lb.yaml 
+          kubectl set image deployment/$K8S_DEPLOYMENT patient-service=github_action_docker:latest -n $K8S_NAMESPACE
+          kubectl rollout status deployment/$K8S_DEPLOYMENT -n $K8S_NAMESPACE
