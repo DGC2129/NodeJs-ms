@@ -113,19 +113,15 @@ jobs:
       - name: Configure kubectl
         uses: azure/setup-kubectl@v3
 
-      - name: Set up Kubeconfig
+      - name: Set up kubectl
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 --decode >> $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
+          aws eks update-kubeconfig --name hcl-eks-bs5zYHqX --region $AWS_REGION
+          kubectl get nodes  # Verify authentication
 
-      - name: Deploy to Kubernetes
-        env:
-          REPO_URL: https://github.com/Patient-Service
+      - name: Deploy Application to EKS
         run: |
           kubectl apply -f deployment.yaml
-          kubectl set image deployment/$K8S_DEPLOYMENT patient-service=github_action_docker:latest -n $K8S_NAMESPACE
-          kubectl rollout status deployment/$K8S_DEPLOYMENT -n $K8S_NAMESPACE                 
+          kubectl apply -f patient-lb.yaml               
 
 
        
