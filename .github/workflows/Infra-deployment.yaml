@@ -1,13 +1,17 @@
 name: "Infra CI/CD Pipeline"
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment to deploy (dev/staging/prod)"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
 
 jobs:
  deploy-infra:
@@ -26,7 +30,8 @@ jobs:
         run: |
           cd terraform
           terraform version
-          
+          terraform init
+                    
       - name: Validate Terraform    
         run: |
           cd terraform
