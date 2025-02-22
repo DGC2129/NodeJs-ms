@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - DGC2129-patch-1 
+      - dev 
   pull_request:
     branches:
       - main
@@ -61,7 +61,6 @@ jobs:
         # terraform apply -auto-approve           
 
   docker-build-push:
-    needs: deploy-infra
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -94,7 +93,7 @@ jobs:
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}   
           
-  deploy:
+  Deploy-to-EKS:
     needs: docker-build-push
     runs-on: ubuntu-latest
     steps:
@@ -104,16 +103,22 @@ jobs:
       - name: Configure kubectl
         uses: azure/setup-kubectl@v3
 
-      - name: Set up Kubeconfig
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          
+         # role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsEKS
+         # aws-region: us-east-1 
+        
+      - name: Set up kubectl
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 --decode >> $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
+          aws eks update-kubeconfig --name hcl-eks-bs5zYHqX --region $AWS_REGION
+          kubectl get nodes  # Verify authentication
 
-      - name: Deploy to Kubernetes
-        env:
-          REPO_URL: https://github.com/Patient-Service
+      - name: Deploy Application to EKS
         run: |
           kubectl apply -f deployment.yaml
-          kubectl set image deployment/$K8S_DEPLOYMENT patient-service=github_action_docker:latest -n $K8S_NAMESPACE
-          kubectl rollout status deployment/$K8S_DEPLOYMENT -n $K8S_NAMESPACE
+          kubectl apply -f patient-lb.yaml 
