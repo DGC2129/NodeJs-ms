@@ -1,4 +1,4 @@
-name: "Infra CI/CD Pipeline"
+name: "Terraform Infra Deployment""
 
 on:
   workflow_dispatch:
