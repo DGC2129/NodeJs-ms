@@ -1,5 +1,4 @@
-name: "Terraform Infra Deployment""
-
+name: "Infra Workflow"
 on:
   workflow_dispatch:
     inputs:
