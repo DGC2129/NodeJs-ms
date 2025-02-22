@@ -1,20 +1,18 @@
-name: "Deployment services to EKS Cluster"
+name: CI/CD for Patient Service
 
 on:
   push:
     branches:
       - main
-      - dev
+      - dev 
   pull_request:
     branches:
       - main
-
 env:
-  ECR_REPOSITORY: my-ecr
+  ECR_REPOSITORY: myrepo
   IMAGE_TAG: latest
   K8S_DEPLOYMENT: patient-service
-  K8S_NAMESPACE: default 
-  AWS_REGION: us-east-1
+  K8S_NAMESPACE: default
 
 jobs:
   build-and-test:
@@ -29,31 +27,30 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: npm install       
-        
-deploy-infra:
-    name: Deploy Infrastructure with Terraform
-    runs-on: ubuntu-latest
-    needs: docker-build-test
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+        run: npm install   
 
-      - name: Set Up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.3.0
+  # deploy-infra:
+   # name: Deploy Infrastructure with Terraform
+    #runs-on: ubuntu-latest
+    #steps:
+     # - name: Checkout Code
+      #  uses: actions/checkout@v3
 
-      - name: Initialize Terraform
-        run: |
-          cd terraform
-          terraform version
-          terraform init
+      #- name: Set Up Terraform
+       # uses: hashicorp/setup-terraform@v2
+        #with:
+         # terraform_version: 1.3.0
+
+      #- name: Initialize Terraform
+       # run: |
+        #  cd terraform
+         # terraform version
+          #terraform init
           
       - name: Validate Terraform    
         run: |
           terraform fmt
-          terraform validate
+          terraform validate /*
 
       #- name: "Terraform Plan"
        # run: terraform plan
@@ -61,10 +58,9 @@ deploy-infra:
       #- name: "Terraform Apply"
        # run: |
         # if: github.ref == 'refs/heads/main'
-        # terraform apply -auto-approve 
+        # terraform apply -auto-approve           
 
-docker-build-push:
-    needs: deploy-infra
+  docker-build-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -96,7 +92,7 @@ docker-build-push:
       - name: docker Push
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}   
-
+          
   Deploy-to-EKS:
     needs: docker-build-push
     runs-on: ubuntu-latest
